@@ -31,9 +31,9 @@ import xdi2.messaging.Operation;
 import xdi2.messaging.context.ExecutionContext;
 import xdi2.messaging.exceptions.Xdi2MessagingException;
 import xdi2.messaging.exceptions.Xdi2NotAuthorizedException;
-import xdi2.messaging.target.AbstractMessagingTarget;
 import xdi2.messaging.target.MessagingTarget;
 import xdi2.messaging.target.Prototype;
+import xdi2.messaging.target.impl.AbstractMessagingTarget;
 import xdi2.messaging.target.interceptor.AbstractInterceptor;
 import xdi2.messaging.target.interceptor.InterceptorResult;
 import xdi2.messaging.target.interceptor.MessageEnvelopeInterceptor;
@@ -47,7 +47,7 @@ import xdi2.messaging.util.MessagingCloneUtil;
  * 
  * @author markus
  */
-public class RefInterceptor extends AbstractInterceptor implements MessageEnvelopeInterceptor, OperationInterceptor, TargetInterceptor, Prototype<RefInterceptor> {
+public class RefInterceptor extends AbstractInterceptor<MessagingTarget> implements MessageEnvelopeInterceptor, OperationInterceptor, TargetInterceptor, Prototype<RefInterceptor> {
 
 	private static final Logger log = LoggerFactory.getLogger(RefInterceptor.class);
 
@@ -186,8 +186,8 @@ public class RefInterceptor extends AbstractInterceptor implements MessageEnvelo
 			XDI3Segment arcXri = refRepRelation.getArcXri();
 			XDI3Segment targetContextNodeXri = refRepRelation.getTargetContextNodeXri();
 
-			boolean doReplaceRefRepRelations = XDIDictionaryConstants.XRI_S_REP.equals(arcXri) || (XDIDictionaryConstants.XRI_S_REF.equals(arcXri) && Boolean.TRUE.equals(operation.getParameterBoolean(GetOperation.XRI_PARAMETER_DEREF)));
-			boolean doIncludeRefRelations = (XDIDictionaryConstants.XRI_S_REF.equals(arcXri) && ! Boolean.TRUE.equals(operation.getParameterBoolean(GetOperation.XRI_PARAMETER_DEREF)));
+			boolean doReplaceRefRepRelations = XDIDictionaryConstants.XRI_S_REP.equals(arcXri) || (XDIDictionaryConstants.XRI_S_REF.equals(arcXri) && Boolean.TRUE.equals(operation.getParameterBoolean(GetOperation.XRI_S_PARAMETER_DEREF)));
+			boolean doIncludeRefRelations = (XDIDictionaryConstants.XRI_S_REF.equals(arcXri) && ! Boolean.TRUE.equals(operation.getParameterBoolean(GetOperation.XRI_S_PARAMETER_DEREF)));
 
 			// replace $ref/$rep relations?
 
@@ -414,7 +414,7 @@ public class RefInterceptor extends AbstractInterceptor implements MessageEnvelo
 		feedbackMessage.deleteOperations();
 
 		Operation feedbackOperation = feedbackMessage.createGetOperation(refRepContextNode.getXri());
-		if (Boolean.TRUE.equals(operation.getParameterBoolean(GetOperation.XRI_PARAMETER_DEREF))) feedbackOperation.setParameter(GetOperation.XRI_PARAMETER_DEREF, Boolean.TRUE);
+		if (Boolean.TRUE.equals(operation.getParameterBoolean(GetOperation.XRI_S_PARAMETER_DEREF))) feedbackOperation.setParameter(GetOperation.XRI_S_PARAMETER_DEREF, Boolean.TRUE);
 
 		// feedback
 

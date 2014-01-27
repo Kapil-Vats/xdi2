@@ -6,6 +6,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import xdi2.core.xri3.XDI3Segment;
 import xdi2.core.xri3.XDI3Statement;
 import xdi2.messaging.Message;
@@ -15,9 +18,6 @@ import xdi2.messaging.exceptions.Xdi2MessagingException;
 import xdi2.messaging.target.MessagingTarget;
 import xdi2.messaging.target.contributor.Contributor;
 import xdi2.messaging.target.interceptor.Interceptor;
-import xdi2.messaging.transport.Request;
-import xdi2.messaging.transport.Response;
-import xdi2.messaging.transport.Transport;
 
 /**
  * Messaging targets as well as contributors and interceptors can use the ExecutionContext
@@ -30,13 +30,7 @@ public final class ExecutionContext implements Serializable {
 
 	private static final long serialVersionUID = 3238581605986543950L;
 
-	/**
-	 * The transport, transport request, and transport response, if any,
-	 * through which the message envelope is executed.
-	 */
-	private Transport<?, ?> transport;
-	private Request request;
-	private Response response;
+	private static Logger log = LoggerFactory.getLogger(ExecutionContext.class.getName());
 
 	/**
 	 * This map is never reset.
@@ -72,10 +66,6 @@ public final class ExecutionContext implements Serializable {
 
 	public ExecutionContext() { 
 
-		this.transport = null;
-		this.request = null;
-		this.response = null;
-		
 		this.executionContextAttributes = new HashMap<String, Object> ();
 		this.messageEnvelopeAttributes = new HashMap<String, Object> ();
 		this.messageAttributes = new HashMap<String, Object> ();
@@ -87,41 +77,6 @@ public final class ExecutionContext implements Serializable {
 		this.topExecutionPosition = this.currentExecutionPosition;
 	}
 
-	/*
-	 * Transport
-	 */
-
-	public Transport<?, ?> getTransport() {
-
-		return this.transport;
-	}
-
-	public void setTransport(Transport<?, ?> transport) {
-		
-		this.transport = transport;
-	}
-
-	public Request getRequest() {
-		
-		return this.request;
-	}
-
-	public void setRequest(Request request) {
-		
-		this.request = request;
-	}
-
-	public Response getResponse() {
-		
-		return this.response;
-	}
-
-	public void setResponse(Response response) {
-
-		this.response = response;
-	}
-	
-	
 	/*
 	 * Attributes
 	 */
@@ -249,10 +204,14 @@ public final class ExecutionContext implements Serializable {
 
 	public Xdi2MessagingException processException(Exception ex) {
 
+		if (log.isDebugEnabled()) log.debug("New Exception: " + (ex == null ? ex : ex.getMessage()) + ". Current: " + (this.ex == null ? null : this.ex.getMessage()) + ". Same? " + (ex == this.ex));
+
 		if (! (ex instanceof Xdi2MessagingException)) {
 
 			ex = new Xdi2MessagingException(ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage(), ex, this);
 		}
+
+		if (this.ex != null) return this.ex;
 
 		this.ex = (Xdi2MessagingException) ex;
 		this.exceptionExecutionPosition = this.currentExecutionPosition;
@@ -294,7 +253,7 @@ public final class ExecutionContext implements Serializable {
 		this.pushExecutionPosition(targetStatement, comment);
 	}
 
-	public void pushInterceptor(Interceptor interceptor, String comment) {
+	public void pushInterceptor(Interceptor<MessagingTarget> interceptor, String comment) {
 
 		this.pushExecutionPosition(interceptor, comment);
 	}
@@ -386,7 +345,8 @@ public final class ExecutionContext implements Serializable {
 		return executionPosition == null ? null : executionPosition.executionObject;
 	}
 
-	public Interceptor getCurrentInterceptor() {
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public Interceptor<MessagingTarget> getCurrentInterceptor() {
 
 		ExecutionPosition<Interceptor> executionPosition = this.findExecutionPosition(this.currentExecutionPosition, Interceptor.class);
 
@@ -442,7 +402,8 @@ public final class ExecutionContext implements Serializable {
 		return executionPosition == null ? null : executionPosition.executionObject;
 	}
 
-	public Interceptor getExceptionInterceptor() {
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public Interceptor<MessagingTarget> getExceptionInterceptor() {
 
 		ExecutionPosition<Interceptor> executionPosition = this.findExecutionPosition(this.exceptionExecutionPosition, Interceptor.class);
 
@@ -463,17 +424,17 @@ public final class ExecutionContext implements Serializable {
 
 	private <T> void pushExecutionPosition(T object, String comment) {
 
+		if (object == null) throw new NullPointerException();
+
 		this.currentExecutionPosition = new ExecutionPosition<T> (this.currentExecutionPosition, object, comment);
 	}
 
-	@SuppressWarnings("unchecked")
 	private <T> void popExecutionPosition(Class<? extends T> clazz) {
 
-		ExecutionPosition<T> executionPosition = (ExecutionPosition<T>) this.currentExecutionPosition;
+		if (this.currentExecutionPosition == this.topExecutionPosition) throw new IllegalStateException("No more execution positions.");
+		if (! clazz.isAssignableFrom(this.currentExecutionPosition.executionObject.getClass())) throw new IllegalStateException("Unexpected execution position class: " + this.currentExecutionPosition.executionObject.getClass().getSimpleName() + " (should be " + clazz.getSimpleName() + ").");
 
-		if (this.currentExecutionPosition == this.topExecutionPosition) throw new IllegalStateException();
-
-		this.currentExecutionPosition = executionPosition.parentExecutionPosition;
+		this.currentExecutionPosition = this.currentExecutionPosition.parentExecutionPosition;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -492,7 +453,7 @@ public final class ExecutionContext implements Serializable {
 	/*
 	 * Tracing
 	 */
-	
+
 	public String getTraceLine() {
 
 		StringBuffer buffer = new StringBuffer();
